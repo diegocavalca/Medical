@@ -1,0 +1,333 @@
+<!-- Copyright (c) 2012 Mobile Developer Solutions -->
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta http-equiv="Content-type" name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no, width=device-width">
+    <title>Mobile Medical App</title>
+
+	<link rel="stylesheet" href="css/jquery.mobile-1.1.0.min.css" />
+	<link rel="stylesheet" href="css/styles.css" />
+	<link rel="stylesheet" href="css/block.css" />
+
+    <script src="jquery.mobile/jquery-1.6.4.min"></script>
+	<script type="text/javascript" charset="utf-8" src="phonegap-1.4.1.js"></script>
+	
+	<script src="js/jquery.mobile-1.1.0.min.js"></script>
+	<script src="js/jquery.blockUI.js"></script>
+
+	<!-- FUNCOES PERONALIZADAS JAVASCRIPT MEDICAL  -->
+	<script src="js/medical_sqlite.js"></script>
+	<script src="js/medical_agenda.js"></script>	
+	
+	<link rel="stylesheet" type="text/css" href="http://dev.jtsage.com/cdn/simpledialog/latest/jquery.mobile.simpledialog.min.css" /> 
+	<script type="text/javascript" src="http://dev.jtsage.com/cdn/simpledialog/latest/jquery.mobile.simpledialog.min.js"></script>
+	
+	<link rel="stylesheet" type="text/css" href="http://jquerymobile.com/demos/1.0a4.1/experiments/ui-datepicker/jquery.ui.datepicker.mobile.css" />
+	<script type="text/javascript" src="http://jquerymobile.com/demos/1.0a4.1/experiments/ui-datepicker/jQuery.ui.datepicker.js"></script>
+	<script type="text/javascript" src="http://jquerymobile.com/demos/1.0a4.1/experiments/ui-datepicker/jquery.ui.datepicker.mobile.js"></script>
+	
+	<!-- LIXOS
+	 	<link rel="stylesheet" href="jquery.mobile/jquery.mobile-1.0.1.min.css" />
+		<link rel="stylesheet" href="index.css" />
+		<script src="jquery.mobile/jquery.mobile-1.0.1.min.js"></script>
+		<script type="text/javascript" charset="utf-8" src="index.js"></script>
+	--> 	
+	
+	<script type="text/javascript" charset="utf-8">
+	
+	document.addEventListener("deviceready", onDeviceReady, false);
+	
+	function onDeviceReady() {
+		
+		$.mobile.defaultPageTransition = "none";
+		$.mobile.defaultDialogTransition = "none";
+		
+		// Verificar conexao
+	    if( isConnected()==true ){
+	    	
+	    	// Verificar se ha atualizacao
+	    	checkVersion();
+			
+			// Exibir Agenda Semanal	    	
+			refreshAgenda("#listAgenda","#edtRetornoAgenda");
+			
+	    	// Verificar se sincronizou dados
+	    	checkLog();
+	    	
+			// Eventos dos Botoes
+			$("#btnRefresh").click(function(){
+				
+				refreshAgenda("#listAgenda","#edtRetornoAgenda");
+								
+			});
+					
+			$("#btnSync").click(function(){
+
+				syncAgenda( $("#edtRetornoAgenda").val() );
+			
+			});		
+			$('#btnSearch').click(function(){
+				
+				/*
+			    $(this).simpledialog({
+			        'mode' : 'blank',
+			        'prompt': false,
+			        'forceInput': false,
+			        'useModal':true,
+				    'buttons' : {
+				      'OK': {
+				        click: function () {
+				          $('#dialogoutput').text('OK');
+				        }
+				      },
+				      'Cancel': {
+				        click: function () {
+				          $('#dialogoutput').text('Cancel');
+				        },
+				        icon: "delete",
+				        theme: "c"
+				      }
+				    },			
+			        'fullHTML' : '<input type="date" name="date" id="date" value=""  />'
+			    })
+			    */
+			  
+		
+			});
+			
+		}else{
+		
+			// Executar Agenda em MODO OFFLINE [BACKUP]
+			function modeOff(button) {
+				
+				if(button==1){
+				
+					listAgenda("#listAgenda");
+												
+				}
+				
+			}
+		    navigator.notification.confirm(
+		        'Não foi encontrada conexão com a internet. Deseja ativar Modo Offline?',
+		        modeOff,
+		        'Sem Conexão',
+		        'Ativar,Cancelar'           
+		    );
+			
+			// Esconder opções
+			$("#pnFooter").hide();
+			
+		}
+		
+
+		
+	}
+	
+	function showLoader(textLoader){
+		
+		if( (textLoader==null) || (textLoader=="") ){
+			textLoader = '<img src="images/ajax-loader.gif"/>';
+		}
+		
+        $.blockUI({ 
+            //message: '<img src="images/ajax-loader.gif"/><br/>CARREGANDO AGENDA...', 
+            //fadeIn: 700, 
+            //fadeOut: 700, 
+			message: textLoader, 
+			css: { 
+            	border: 'none', 
+            	padding: '15px', 
+				font:'18px',
+            	backgroundColor: '#000', 
+            	'-webkit-border-radius': '10px', 
+            	'-moz-border-radius': '10px', 
+            	opacity: .5, 
+        	    color: '#fff' 
+        	} 
+		}); 
+	}
+	
+	function hideLoader(){
+		$.unblockUI();
+	}
+	
+	function isConnected() {
+	    var networkState = navigator.network.connection.type;
+		
+		if(networkState==null){
+			return false;
+		}else{
+			return true;
+		}
+	}
+	
+	function checkVersion(){
+
+		$.ajax({
+			url: 'http://www.needa.com.br/medical/api/version.php',
+			type: "GET",
+			dataType: "jsonp",
+			async: false,
+			success: function( response ){
+				
+				if( $("#edtVersion").val()!=response.last.version ){
+					
+					// Abrir Link para update do Aplicativo
+					function updateApp(button) {
+						
+						if(button==1){
+						
+							var url=new Array();
+							url["android"]=response.last.url.android;
+							url["iphone"]=response.last.url.iphone;
+							
+							navigator.app.loadUrl( url[device.platform.toLowerCase()] );
+														
+						}
+						
+					}
+					
+				    navigator.notification.confirm(
+				        'Atualize seu Medical para a versão '+response.last.version,
+				        updateApp,
+				        'Nova versão disponível',
+				        'Atualizar,Cancelar'           
+				    );
+					
+					
+					abort;
+					
+				}
+				
+			},
+			error:function(xhr,err){
+			    alert("responseText: "+xhr.responseText); //alert("readyState: "+xhr.readyState+"\nstatus: "+xhr.status);
+			}
+		});		
+
+	}
+	
+	function checkLog(){
+				
+		$.ajax({
+			url: 'http://www.needa.com.br/medical/api/log.php?UUID='+device.uuid,
+			type: "GET",
+			dataType: "jsonp",
+			success: function( response ){
+				
+				if( response.total == 0 ){
+					
+					// Comecar Sincronizacao
+					function syncClick(button) {
+						
+						if(button==1){
+						
+							syncAgenda();
+														
+						}else{
+							refreshAgenda();
+						}
+						
+					}
+					
+				    navigator.notification.confirm(
+				        'Sincronize sua Agenda e tenha seus compromissos a qualquer instante',
+				        syncClick,
+				        'Agenda Semanal',
+				        'Sincronizar,Cancelar'           
+				    );
+					
+					// Gravar log diario 
+					log = '?OBJECT=table&MODE=insert&TABLE=log&REQUEST_FIELDS=DATA,HORA&REGISTERS={"DEVICE_ID":"'+device.uuid+'"}';
+					$.getJSON( 'http://www.needa.com.br/medical/api/manager.php'+log , function(response){
+						
+						if(response.ID_MSG!="0"){
+							alert("#ERROR: "+response.MESSAGE);
+						}
+						
+					});
+
+					abort;
+					
+				}
+				
+			},
+			error:function(xhr,err){
+			    alert("responseText: "+xhr.responseText); //alert("readyState: "+xhr.readyState+"\nstatus: "+xhr.status);
+			}
+		});		
+
+	}
+	
+	</script>
+	
+	<style>
+		#header{
+			text-align:center
+		}
+		#header h1{
+			width:100%;
+			background:#ff0
+		}
+		#footerTabs {
+			background: #FFF -webkit-radial-gradient(circle, #FFF, #dee2e4);
+		}
+		#btnRefresh .ui-icon{ background:  url(images/icons/02-redo.png) 0 0 no-repeat; }
+		#btnSearch .ui-icon{ background:  url(images/icons/06-magnify.png) 0 50% no-repeat; }
+		#btnSync .ui-icon{ background:  url(images/icons/03-loopback.png) 0 50% no-repeat; }
+		
+		#btnBackup .ui-icon{ background:  url(images/icons/40-inbox.png) 0 50% no-repeat; }
+		#btnRestore .ui-icon{ background:  url(images/icons/44-shoebox.png) 0 50% no-repeat; }
+		
+	</style>
+
+  </head>
+  
+  <body onload="init();">
+	
+	<input type="hidden" id="edtVersion" value="1.0.0"/>
+	<input type="hidden" id="edtRetornoAgenda" />
+	
+	<div data-role="page"> 
+		
+		<div data-role="header">
+			<h1 align="center">
+				MEDICAL
+				<!--<img src="images/logo_medical_m.png"/>-->
+			</h1>
+		</div>
+	
+		<div data-role="content"> 
+	
+			<ul data-role="listview" data-filter="true" id="listAgenda"></ul>
+	
+		</div>
+		
+		<div data-role="footer" data-position="fixed" id="pnFooter">
+			<div data-role="navbar">
+				<ul>
+					<li><a href="#" id="btnRefresh" data-icon="custom" class="ui-btn-active">Atualizar</a></li>
+					<li><a href="#" id="btnSearch" data-icon="custom" >Localizar</a></li>
+					<li><a href="#" id="btnSync" data-icon="custom">Sincronizar</a></li>
+				</ul>
+			</div>
+		</div>
+	
+	</div>
+	
+	<!-- PHONEGAP SCRIPTS -->
+	<script type="text/javascript" charset="utf-8" src="apis/accelerometer.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/camera.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/capture.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/compass.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/connection.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/contacts.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/device.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/events.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/file.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/geolocation.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/media.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/notification.js"></script>
+	<script type="text/javascript" charset="utf-8" src="apis/storage.js"></script> 			
+  </body>
+</html>
