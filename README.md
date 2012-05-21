@@ -1,4 +1,0 @@
-Medical
-=======
-
-Medical Mobile App
